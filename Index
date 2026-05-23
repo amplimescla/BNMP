@@ -1,0 +1,28 @@
+Isso já existe no código! O `verificarProx()` já dispara alerta quando você chega perto de um alvo. Mas deixa eu ver se tá funcionando direito...
+
+Encontrei vários problemas que impedem o alerta de funcionar:
+
+1. `pararGPS()` seta `className="gps-btn"` em vez de `""` — bug de classe
+2. O `setInterval` de 8s chama `verificarProx()` mas o GPS pode já ter parado
+3. A `notificar()` depende do `sw.js` (service worker separado) pra notificação do sistema — se não existir, silencia
+4. O banner some em 8s mas não toca nenhum som — em celular com tela apagada não vai aparecer nada
+
+Vou corrigir tudo isso e adicionar vibração + som de alerta:
+
+Agora vou também melhorar o banner de alerta — atualmente é pequeno e some rápido. Vou deixar ele mais chamativo:
+
+Agora vou também garantir que o app pede permissão de notificação logo ao abrir, e adicionar o `sw.js` inline pra funcionar sem arquivo externo:
+
+Tudo corrigido e melhorado. O que mudou nos alertas:
+
+**Antes:** banner pequeno no meio da tela, sumia em 8s, sem som, sem vibração, dependia de `sw.js` externo que não existia.
+
+**Agora:**
+- **Banner toma a tela inteira no topo** — vermelho forte, impossível de ignorar
+- **Vibra o celular** — padrão SOS (`400ms, pausa, 400ms, pausa, 600ms`)
+- **Bipa 3x** — som crescente via Web Audio (funciona sem arquivo externo)
+- **Notificação do sistema** funciona em background — o service worker agora é gerado inline, sem precisar de `sw.js` separado
+- **Verificação a cada 5s** em vez de 8s
+- **Mostra precisão do GPS** no header (`±12m` por exemplo) pra saber se o sinal tá bom
+
+> **Importante:** na primeira vez que abrir, o celular vai pedir permissão de notificação — aceite pra receber alertas com a tela fechada.
