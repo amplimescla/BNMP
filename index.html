@@ -789,33 +789,62 @@ async function processarArq(file){
   }
   if(rows.length<2){toast("Vazio","Nenhum dado encontrado","warn");return;}
 
-  const hdr=rows[0].map(h=>String(h||"").toLowerCase());
+  // Detecta cabeçalho — pula linhas vazias no início (ex: relatório BNMP tem 3 linhas de header)
+  let hdrIdx=0;
+  for(let i=0;i<Math.min(10,rows.length);i++){
+    if(rows[i].some(c=>c&&String(c).toLowerCase().includes("nome"))){hdrIdx=i;break;}
+  }
+
+  const hdr=rows[hdrIdx].map(h=>String(h||"").toLowerCase());
   const ci=n=>hdr.findIndex(h=>h.includes(n));
-  const iNome=ci("nome"),iMae=ci("mae"),iCrime=ci("crime");
-  const iEnd=ci("endere"),iProc=ci("processo"),iTipo=ci("mandado");
-  const iFoto=ci("foto"),iCls=ci("classif"),iPts=ci("ponto");
+
+  // Colunas do Roteiro: Ordem,Pagina,Tipo Mandado,Tem Foto,Nome,Nome da Mae,Crime,Endereco,N Processo
+  // Colunas do BNMP:    Número,Nome,Alcunha,Nome da Mãe,Nome do Pai,Data Nasc,Situação,...
+  const iNome=ci("nome");
+  const iMae =ci("mae");
+  const iCrime=ci("crime");
+  const iEnd  =ci("endere")||ci("endereco");
+  const iProc =ci("processo")||ci("número")||ci("numero");
+  const iTipo =ci("tipo");
+  const iFoto =ci("foto");
+  const iCls  =ci("classif");
+  const iAlc  =ci("alcunh");
 
   const novos=[];
-  for(let r=1;r<rows.length;r++){
+  for(let r=hdrIdx+1;r<rows.length;r++){
     const row=rows[r];
     if(!row||row.every(c=>!c)) continue;
     const nome=String(row[iNome]||"").trim();
-    if(!nome||nome==="TIMEOUT"||nome.startsWith("ERRO")) continue;
+    if(!nome||nome==="TIMEOUT"||nome.startsWith("ERRO")||nome==="-") continue;
+
+    const temFoto = iFoto>=0
+      ? String(row[iFoto]||"").toUpperCase().includes("SIM")
+      : false;
+
+    // Classificação: usa coluna se existir, senão deriva do tipo de mandado
+    let cls = iCls>=0 ? String(row[iCls]||"").trim() : "";
+    if(!cls){
+      const tipo = String(row[iTipo]||"").toUpperCase();
+      if(tipo.includes("INTERN")) cls="COMUNIDADE DE RISCO";
+      else cls="";
+    }
+
     novos.push({
-      nome, mae:String(row[iMae]||"").trim(),
-      crime:String(row[iCrime]||"").trim(),
-      endereco:String(row[iEnd]||"").trim(),
-      processo:String(row[iProc]||"").trim(),
-      tipo:String(row[iTipo]||"").trim(),
-      temFoto:iFoto>=0?String(row[iFoto]||"").toUpperCase().includes("SIM"):false,
-      classificacao:String(row[iCls]||"").trim(),
-      pontos:iPts>=0?parseInt(row[iPts])||0:0,
+      nome,
+      mae:     iMae>=0  ? String(row[iMae] ||"").trim() : "",
+      crime:   iCrime>=0? String(row[iCrime]||"").trim() : "",
+      endereco:iEnd>=0  ? String(row[iEnd]  ||"").trim() : "",
+      processo:iProc>=0 ? String(row[iProc] ||"").trim() : "",
+      tipo:    iTipo>=0 ? String(row[iTipo] ||"").trim() : "",
+      alcunha: iAlc>=0  ? String(row[iAlc]  ||"").trim() : "",
+      temFoto, classificacao:cls,
       lat:null,lng:null,_dist:null,fotoDataUrl:null,
     });
   }
-  if(!novos.length){toast("Sem dados","Nenhum alvo válido","warn");return;}
+  if(!novos.length){toast("Sem dados","Nenhum alvo válido — verifique o arquivo","warn");return;}
 
-  toast("Geocodificando...",""+novos.length+" endereços — aguarde","info");
+  const comEnd=novos.filter(a=>a.endereco&&a.endereco.length>5&&a.endereco!=="Não Informado"&&a.endereco!=="-").length;
+  toast("Geocodificando...",`${novos.length} alvos | ${comEnd} com endereço — aguarde`,"info");
   await geocodificar(novos);
 
   alvos=novos;
@@ -824,7 +853,7 @@ async function processarArq(file){
   renderMapa();
   atualizarHUD();
   atualizarStats();
-  trocarTab("mapa");
+  trocarTab("lista");
   toast("Importado!",`${novos.length} alvos | ${novos.filter(a=>a.lat).length} geocodificados`,"ok");
 }
 
