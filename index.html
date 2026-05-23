@@ -459,7 +459,7 @@ input[type=range]{
     <h3>Relatório BNMP</h3>
     <p>Alcunha, nascimento, órgão expedidor<br/><b>relatorio.xls / .xlsx</b></p>
   </div>
-  <input type="file" id="file-bnmp" accept=".xlsx,.xls,.csv"/>
+  <input type="file" id="file-bnmp" accept=".xlsx,.xls,.csv" style="display:none"/>
   <div id="bnmp-status" style="display:none;font-family:var(--mono);font-size:11px;color:var(--accentg);padding:6px 2px;letter-spacing:1px">✔ BNMP CARREGADO</div>
 
   <div id="stats-wrap" style="display:none">
@@ -772,6 +772,11 @@ document.getElementById("file-in").addEventListener("change",e=>{
   if(f) processarArq(f);
   e.target.value="";
 });
+document.getElementById("file-bnmp").addEventListener("change",e=>{
+  const f=e.target.files[0];
+  if(f) processarBNMP(f);
+  e.target.value="";
+});
 const dz=document.getElementById("dz");
 dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag")});
 dz.addEventListener("dragleave",()=>dz.classList.remove("drag"));
@@ -862,6 +867,53 @@ async function processarArq(file){
   atualizarStats();
   trocarTab("lista");
   toast("Importado!",`${novos.length} alvos | ${novos.filter(a=>a.lat).length} geocodificados`,"ok");
+}
+
+// ══════════════════════════════════════════════
+// IMPORTAR BNMP (complemento)
+// ══════════════════════════════════════════════
+async function processarBNMP(file){
+  toast("Lendo BNMP...","Processando "+file.name,"info");
+  try {
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:"array"});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+    // Acha header
+    let hdrIdx=0;
+    for(let i=0;i<Math.min(10,rows.length);i++){
+      if(rows[i].some(c=>c&&String(c).toLowerCase().includes("nome"))){hdrIdx=i;break;}
+    }
+    const hdr=rows[hdrIdx].map(h=>String(h||"").toLowerCase());
+    const ci=n=>hdr.findIndex(h=>h.includes(n));
+    const iNum=ci("número")||ci("numero")||ci("n ");
+    const iNome=ci("nome");
+    const iAlc=ci("alcunh");
+    const iNasc=ci("nasc");
+    const iOrg=ci("órgão")||ci("orgao")||ci("expedidor");
+    // Monta mapa por processo
+    const mapa={};
+    for(let r=hdrIdx+1;r<rows.length;r++){
+      const row=rows[r];
+      if(!row||!row[iNum]) continue;
+      const num=String(row[iNum]).trim();
+      mapa[num]={
+        alcunha: iAlc>=0?String(row[iAlc]||"").trim():"",
+        nascimento: iNasc>=0?String(row[iNasc]||"").trim():"",
+        orgao: iOrg>=0?String(row[iOrg]||"").trim():"",
+      };
+    }
+    // Cruza com alvos
+    let cruzados=0;
+    alvos.forEach(a=>{
+      if(a.processo&&mapa[a.processo]){
+        Object.assign(a,mapa[a.processo]);
+        cruzados++;
+      }
+    });
+    salvarLocal();
+    document.getElementById("bnmp-status").style.display="block";
+    toast("BNMP ok",`${Object.keys(mapa).length} registros | ${cruzados} cruzados`,"ok");
+  } catch(e){ toast("Erro BNMP",String(e),"warn"); }
 }
 
 // ══════════════════════════════════════════════
