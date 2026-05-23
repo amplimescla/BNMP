@@ -779,14 +779,21 @@ dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("drag");co
 
 async function processarArq(file){
   toast("Lendo...","Processando "+file.name,"info");
-  const buf=await file.arrayBuffer();
+  let buf;
+  try { buf=await file.arrayBuffer(); } catch(e){ alert("Erro ao ler arquivo: "+e); return; }
   let rows=[];
-  if(file.name.endsWith(".csv")){
-    rows=new TextDecoder().decode(buf).split("\n").map(l=>l.split(";"));
-  } else {
-    const wb=XLSX.read(buf,{type:"array"});
-    rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
-  }
+  try {
+    if(file.name.endsWith(".csv")){
+      rows=new TextDecoder().decode(buf).split("\n").map(l=>l.split(";"));
+    } else {
+      const wb=XLSX.read(buf,{type:"array"});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      rows=XLSX.utils.sheet_to_json(sheet,{header:1});
+    }
+  } catch(e){ alert("Erro ao processar planilha: "+e); return; }
+
+  alert("Lido: "+rows.length+" linhas. Primeira: "+JSON.stringify(rows[0]).substring(0,120));
+
   if(rows.length<2){toast("Vazio","Nenhum dado encontrado","warn");return;}
 
   // Detecta cabeçalho — pula linhas vazias no início (ex: relatório BNMP tem 3 linhas de header)
