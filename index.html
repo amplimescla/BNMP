@@ -450,7 +450,7 @@ input[type=range]{
     <h3>Roteiro da operação</h3>
     <p>Tem endereço, crime e foto<br/><b>ROTEIRO_FINAL_OPERACAO.xlsx</b></p>
   </div>
-  <input type="file" id="file-in" accept=".xlsx,.xls,.csv"/>
+  <input type="file" id="file-in" accept=".xlsx,.xls,.csv" style="display:none"/>
 
   <p class="sec" style="margin-top:12px">2 · Relatório BNMP (complemento)</p>
 
@@ -796,8 +796,6 @@ async function processarArq(file){
       rows=XLSX.utils.sheet_to_json(sheet,{header:1});
     }
   } catch(e){ alert("Erro ao processar planilha: "+e); return; }
-
-  alert("Lido: "+rows.length+" linhas. Primeira: "+JSON.stringify(rows[0]).substring(0,120));
 
   if(rows.length<2){toast("Vazio","Nenhum dado encontrado","warn");return;}
 
